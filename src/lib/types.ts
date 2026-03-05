@@ -61,5 +61,14 @@ export interface Attachment {
   uploaded_at: string
 }
 
+export interface WorkLog {
+  id: string
+  request_id: string
+  summary: string | null
+  hours_spent: number | null
+  cost: number | null
+  created_at: string
+}
+
 export type Priority = 'low' | 'medium' | 'high' | 'urgent'
 export type Status = 'open' | 'in_progress' | 'waiting' | 'closed'

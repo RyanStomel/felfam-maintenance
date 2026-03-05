@@ -24,7 +24,7 @@ import { PriorityBadge, StatusBadge } from '@/components/badges'
 import { useToast } from '@/components/toast'
 import { format, differenceInDays } from 'date-fns'
 import { clsx } from 'clsx'
-import type { Request, Property, Vendor, Category, Comment, Attachment, Priority, Status } from '@/lib/types'
+import type { Request, Property, Vendor, Category, Comment, Attachment, WorkLog, Priority, Status } from '@/lib/types'
 
 type Tab = 'details' | 'work' | 'comments' | 'files' | 'status'
 
@@ -40,6 +40,7 @@ export default function RequestDetailPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [comments, setComments] = useState<Comment[]>([])
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [workLogs, setWorkLogs] = useState<WorkLog[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('details')
   const [editing, setEditing] = useState(false)
@@ -55,10 +56,11 @@ export default function RequestDetailPage() {
   const [editDescription, setEditDescription] = useState('')
   const [editDueDate, setEditDueDate] = useState('')
 
-  // Work log state
+  // Work log state — new entry form
   const [workSummary, setWorkSummary] = useState('')
   const [hoursSpent, setHoursSpent] = useState('')
   const [totalCost, setTotalCost] = useState('')
+  const [savingWorkLog, setSavingWorkLog] = useState(false)
 
   // Comment state
   const [commentAuthor, setCommentAuthor] = useState('')
@@ -96,6 +98,15 @@ export default function RequestDetailPage() {
     setAttachments(data || [])
   }, [id, supabase])
 
+  const fetchWorkLogs = useCallback(async () => {
+    const { data } = await supabase
+      .from('work_logs')
+      .select('*')
+      .eq('request_id', id)
+      .order('created_at', { ascending: false })
+    setWorkLogs(data || [])
+  }, [id, supabase])
+
   useEffect(() => {
     async function load() {
       const [, , propRes, vendRes, catRes] = await Promise.all([
@@ -105,7 +116,7 @@ export default function RequestDetailPage() {
         supabase.from('vendors').select('*').eq('active', true).order('name'),
         supabase.from('categories').select('*').eq('active', true).order('name'),
       ])
-      await fetchAttachments()
+      await Promise.all([fetchAttachments(), fetchWorkLogs()])
       setProperties(propRes.data || [])
       setVendors(vendRes.data || [])
       setCategories(catRes.data || [])
@@ -155,22 +166,24 @@ export default function RequestDetailPage() {
     }
   }
 
-  const updateWorkLog = async () => {
-    const { error } = await supabase
-      .from('requests')
-      .update({
-        work_summary: workSummary || null,
-        hours_spent: hoursSpent ? parseFloat(hoursSpent) : null,
-        total_cost: totalCost ? parseFloat(totalCost) : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-
+  const addWorkLogEntry = async () => {
+    if (!workSummary.trim() && !hoursSpent && !totalCost) return
+    setSavingWorkLog(true)
+    const { error } = await supabase.from('work_logs').insert({
+      request_id: id,
+      summary: workSummary.trim() || null,
+      hours_spent: hoursSpent ? parseFloat(hoursSpent) : null,
+      cost: totalCost ? parseFloat(totalCost) : null,
+    })
+    setSavingWorkLog(false)
     if (error) {
-      toast('Failed to update work log', 'error')
+      toast('Failed to save entry', 'error')
     } else {
-      toast('Work log updated!')
-      fetchRequest()
+      toast('Work entry added!')
+      setWorkSummary('')
+      setHoursSpent('')
+      setTotalCost('')
+      fetchWorkLogs()
     }
   }
 
@@ -259,7 +272,7 @@ export default function RequestDetailPage() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'details', label: 'Details' },
-    { key: 'work', label: 'Work Log' },
+    { key: 'work', label: `Work Log${workLogs.length > 0 ? ` (${workLogs.length})` : ''}` },
     { key: 'comments', label: `Comments (${comments.length})` },
     { key: 'files', label: `Files (${attachments.length})` },
     { key: 'status', label: 'Status' },
@@ -457,68 +470,112 @@ export default function RequestDetailPage() {
       {/* TAB: Work Log */}
       {activeTab === 'work' && (
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Work Summary</label>
+
+          {/* Running totals */}
+          {workLogs.length > 0 && (() => {
+            const totalHrs = workLogs.reduce((s, l) => s + (l.hours_spent || 0), 0)
+            const totalCostSum = workLogs.reduce((s, l) => s + (l.cost || 0), 0)
+            return (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-50 rounded-xl p-3 text-center">
+                  <p className="text-xs text-blue-500 font-medium uppercase tracking-wide">Total Hours</p>
+                  <p className="text-2xl font-bold text-blue-700 mt-0.5">{totalHrs % 1 === 0 ? totalHrs : totalHrs.toFixed(1)}</p>
+                </div>
+                <div className="bg-green-50 rounded-xl p-3 text-center">
+                  <p className="text-xs text-green-500 font-medium uppercase tracking-wide">Total Cost</p>
+                  <p className="text-2xl font-bold text-green-700 mt-0.5">${totalCostSum.toFixed(2)}</p>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Past entries */}
+          {workLogs.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">History</h3>
+              <div className="space-y-2">
+                {workLogs.map((log) => (
+                  <div key={log.id} className="bg-white rounded-xl border border-gray-100 p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-gray-400 font-medium">
+                        {format(new Date(log.created_at), 'MMM d, yyyy · h:mm a')}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {log.hours_spent != null && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                            {log.hours_spent}h
+                          </span>
+                        )}
+                        {log.cost != null && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                            ${log.cost.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {log.summary && (
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{log.summary}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* New entry form */}
+          <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700">Add Work Entry</h3>
             <textarea
               value={workSummary}
               onChange={(e) => setWorkSummary(e.target.value)}
-              rows={4}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base"
-              placeholder="Describe work performed..."
+              rows={3}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base bg-white"
+              placeholder="What was done? What still needs attention?"
             />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Hours Spent</label>
-              <input
-                type="number"
-                step="0.5"
-                value={hoursSpent}
-                onChange={(e) => setHoursSpent(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base min-h-[44px]"
-                placeholder="0"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Hours</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={hoursSpent}
+                  onChange={(e) => setHoursSpent(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base min-h-[44px] bg-white"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Cost ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={totalCost}
+                  onChange={(e) => setTotalCost(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base min-h-[44px] bg-white"
+                  placeholder="0.00"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Total Cost ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={totalCost}
-                onChange={(e) => setTotalCost(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base min-h-[44px]"
-                placeholder="0.00"
-              />
+            <div className="flex gap-2">
+              <label className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl border-2 border-dashed border-gray-200 text-gray-500 cursor-pointer hover:border-navy hover:text-navy min-h-[48px] bg-white">
+                <Camera className="w-4 h-4" />
+                <span className="text-sm font-medium">Receipt</span>
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => uploadFile(e.target.files, 'receipt')} />
+              </label>
+              <label className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl border-2 border-dashed border-gray-200 text-gray-500 cursor-pointer hover:border-navy hover:text-navy min-h-[48px] bg-white">
+                <Camera className="w-4 h-4" />
+                <span className="text-sm font-medium">Photo</span>
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadFile(e.target.files, 'completion_photo')} />
+              </label>
             </div>
+            <button
+              onClick={addWorkLogEntry}
+              disabled={savingWorkLog || (!workSummary.trim() && !hoursSpent && !totalCost)}
+              className="w-full py-3.5 rounded-xl bg-navy text-white font-semibold text-base min-h-[52px] disabled:opacity-50"
+            >
+              {savingWorkLog ? 'Saving...' : 'Add Entry'}
+            </button>
           </div>
-          <div className="flex gap-2">
-            <label className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 cursor-pointer hover:border-navy hover:text-navy min-h-[52px]">
-              <Camera className="w-5 h-5" />
-              <span className="text-sm font-medium">Upload Receipt</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => uploadFile(e.target.files, 'receipt')}
-              />
-            </label>
-            <label className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 cursor-pointer hover:border-navy hover:text-navy min-h-[52px]">
-              <Camera className="w-5 h-5" />
-              <span className="text-sm font-medium">Completion Photo</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => uploadFile(e.target.files, 'completion_photo')}
-              />
-            </label>
-          </div>
-          <button
-            onClick={updateWorkLog}
-            className="w-full py-3.5 rounded-xl bg-navy text-white font-semibold text-base min-h-[52px]"
-          >
-            Update Work Log
-          </button>
         </div>
       )}
 
