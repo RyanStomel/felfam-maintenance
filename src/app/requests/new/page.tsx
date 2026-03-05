@@ -12,7 +12,6 @@ import { clsx } from 'clsx'
 import type { Property, Vendor, Category, Priority } from '@/lib/types'
 
 const schema = z.object({
-  submitter_name: z.string().min(1, 'Your name is required'),
   title: z.string().min(1, 'Title is required'),
   property_id: z.string().min(1, 'Property is required'),
   unit_area: z.string().optional(),
@@ -79,6 +78,7 @@ export default function NewRequestPage() {
         .from('requests')
         .insert({
           ...data,
+          submitter_name: null,
           category_id: data.category_id || null,
           assigned_to: data.assigned_to || null,
           due_date: data.due_date || null,
@@ -137,19 +137,6 @@ export default function NewRequestPage() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Submitter Name */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
-          <input
-            {...register('submitter_name')}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base min-h-[44px]"
-            placeholder="Who's submitting this?"
-          />
-          {errors.submitter_name && (
-            <p className="text-red-500 text-sm mt-1">{errors.submitter_name.message}</p>
-          )}
-        </div>
-
         {/* Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
