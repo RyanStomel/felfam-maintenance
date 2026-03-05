@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Felfam Maintenance',
-  description: 'Property maintenance management system',
+  title: 'Workhorse',
+  description: 'Property maintenance management',
 }
 
 export const viewport: Viewport = {

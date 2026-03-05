@@ -20,7 +20,7 @@ export function TopNav() {
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2 font-bold text-lg">
             <Wrench className="w-6 h-6" />
-            Felfam Maintenance
+            Workhorse
           </Link>
           <div className="flex items-center gap-1">
             {navItems.map((item) => {

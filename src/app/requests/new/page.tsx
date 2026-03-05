@@ -95,7 +95,7 @@ export default function NewRequestPage() {
       ]
 
       for (const { file, type } of allFiles) {
-        const path = `${req.id}/${file.name}`
+        const path = `${req.id}/${Date.now()}-${file.name}`
         const { error: uploadErr } = await supabase.storage
           .from('maintenance-files')
           .upload(path, file)
@@ -116,7 +116,7 @@ export default function NewRequestPage() {
       }
 
       toast('Request created successfully!')
-      router.push(`/requests/${req.id}`)
+      router.push('/')
     } catch {
       toast('Failed to create request', 'error')
     } finally {
