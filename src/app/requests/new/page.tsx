@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Camera, FileUp, ArrowLeft } from 'lucide-react'
+import { FileUp, ArrowLeft } from 'lucide-react'
+import { ImageUpload } from '@/components/image-upload'
 import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/toast'
 import { clsx } from 'clsx'
@@ -261,19 +262,10 @@ export default function NewRequestPage() {
         {/* Photo Upload */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Photos</label>
-          <label className="flex items-center justify-center gap-2 w-full py-4 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 cursor-pointer hover:border-navy hover:text-navy transition-colors min-h-[56px]">
-            <Camera className="w-5 h-5" />
-            <span className="text-base font-medium">
-              {photos.length > 0 ? `${photos.length} photo(s) selected` : 'Add Photos'}
-            </span>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => setPhotos(Array.from(e.target.files || []))}
-            />
-          </label>
+          <ImageUpload
+            onFiles={(files) => setPhotos((prev) => [...prev, ...files])}
+            selectedCount={photos.length}
+          />
         </div>
 
         {/* Document Upload */}

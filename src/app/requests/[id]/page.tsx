@@ -12,13 +12,13 @@ import {
   Save,
   X,
   Send,
-  Camera,
   FileUp,
   Download,
   Image as ImageIcon,
   FileText,
   Trash2,
 } from 'lucide-react'
+import { ImageUpload } from '@/components/image-upload'
 import { createClient } from '@/lib/supabase'
 import { PriorityBadge, StatusBadge } from '@/components/badges'
 import { useToast } from '@/components/toast'
@@ -557,16 +557,17 @@ export default function RequestDetailPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <label className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl border-2 border-dashed border-gray-200 text-gray-500 cursor-pointer hover:border-navy hover:text-navy min-h-[48px] bg-white">
-                <Camera className="w-4 h-4" />
-                <span className="text-sm font-medium">Receipt</span>
-                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => uploadFile(e.target.files, 'receipt')} />
-              </label>
-              <label className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl border-2 border-dashed border-gray-200 text-gray-500 cursor-pointer hover:border-navy hover:text-navy min-h-[48px] bg-white">
-                <Camera className="w-4 h-4" />
-                <span className="text-sm font-medium">Photo</span>
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadFile(e.target.files, 'completion_photo')} />
-              </label>
+              <ImageUpload
+                label="Receipt"
+                multiple={false}
+                onFiles={(files) => { const dt = new DataTransfer(); files.forEach(f => dt.items.add(f)); uploadFile(dt.files, 'receipt') }}
+                className="flex-1"
+              />
+              <ImageUpload
+                label="Photo"
+                onFiles={(files) => { const dt = new DataTransfer(); files.forEach(f => dt.items.add(f)); uploadFile(dt.files, 'completion_photo') }}
+                className="flex-1"
+              />
             </div>
             <button
               onClick={addWorkLogEntry}
@@ -628,17 +629,11 @@ export default function RequestDetailPage() {
       {activeTab === 'files' && (
         <div className="space-y-4">
           <div className="flex gap-2">
-            <label className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 cursor-pointer hover:border-navy hover:text-navy min-h-[52px]">
-              <Camera className="w-5 h-5" />
-              <span className="text-sm font-medium">Upload Photo</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => uploadFile(e.target.files, 'photo')}
-              />
-            </label>
+            <ImageUpload
+              label="Upload Photo"
+              onFiles={(files) => { const dt = new DataTransfer(); files.forEach(f => dt.items.add(f)); uploadFile(dt.files, 'photo') }}
+              className="flex-1"
+            />
             <label className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 cursor-pointer hover:border-navy hover:text-navy min-h-[52px]">
               <FileUp className="w-5 h-5" />
               <span className="text-sm font-medium">Upload Doc</span>
