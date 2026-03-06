@@ -13,6 +13,9 @@ create table properties (
 create table vendors (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  phone_number text check (phone_number is null or phone_number ~ '^\+[1-9][0-9]{9,14}$'),
+  sms_enabled boolean default false,
+  sms_broadcast boolean default false,
   active boolean default true,
   created_at timestamptz default now()
 );
@@ -52,6 +55,16 @@ create table comments (
   request_id uuid references requests(id) on delete cascade,
   author_name text not null,
   body text not null,
+  created_at timestamptz default now()
+);
+
+-- Work log entries
+create table work_logs (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid references requests(id) on delete cascade,
+  summary text,
+  hours_spent numeric,
+  cost numeric,
   created_at timestamptz default now()
 );
 

@@ -169,21 +169,32 @@ export default function RequestDetailPage() {
   const addWorkLogEntry = async () => {
     if (!workSummary.trim() && !hoursSpent && !totalCost) return
     setSavingWorkLog(true)
-    const { error } = await supabase.from('work_logs').insert({
-      request_id: id,
-      summary: workSummary.trim() || null,
-      hours_spent: hoursSpent ? parseFloat(hoursSpent) : null,
-      cost: totalCost ? parseFloat(totalCost) : null,
-    })
-    setSavingWorkLog(false)
-    if (error) {
-      toast('Failed to save entry', 'error')
-    } else {
+    try {
+      const response = await fetch(`/api/requests/${id}/work-logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summary: workSummary.trim() || null,
+          hours_spent: hoursSpent ? parseFloat(hoursSpent) : null,
+          cost: totalCost ? parseFloat(totalCost) : null,
+        }),
+      })
+
+      const payload = (await response.json()) as { error?: string }
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to save entry')
+      }
+
       toast('Work entry added!')
       setWorkSummary('')
       setHoursSpent('')
       setTotalCost('')
+      fetchRequest()
       fetchWorkLogs()
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to save entry', 'error')
+    } finally {
+      setSavingWorkLog(false)
     }
   }
 
@@ -206,21 +217,22 @@ export default function RequestDetailPage() {
     if (newStatus === 'closed') {
       if (!confirm('Mark this request as closed?')) return
     }
-    const update: Record<string, unknown> = {
-      status: newStatus,
-      updated_at: new Date().toISOString(),
-    }
-    if (newStatus === 'closed') {
-      update.closed_at = new Date().toISOString()
-    } else {
-      update.closed_at = null
-    }
-    const { error } = await supabase.from('requests').update(update).eq('id', id)
-    if (error) {
-      toast('Failed to update status', 'error')
-    } else {
+    try {
+      const response = await fetch(`/api/requests/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      const payload = (await response.json()) as { error?: string }
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to update status')
+      }
+
       toast(`Status changed to ${newStatus.replace('_', ' ')}`)
       fetchRequest()
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to update status', 'error')
     }
   }
 

@@ -75,19 +75,23 @@ export default function NewRequestPage() {
   const onSubmit = async (data: FormData) => {
     setSubmitting(true)
     try {
-      const { data: req, error } = await supabase
-        .from('requests')
-        .insert({
+      const response = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           ...data,
-          submitter_name: null,
           category_id: data.category_id || null,
           assigned_to: data.assigned_to || null,
           due_date: data.due_date || null,
-        })
-        .select()
-        .single()
+        }),
+      })
 
-      if (error) throw error
+      const payload = (await response.json()) as { request?: { id: string }; error?: string }
+      if (!response.ok || !payload.request) {
+        throw new Error(payload.error || 'Failed to create request')
+      }
+
+      const req = payload.request
 
       // Upload files
       const allFiles = [
@@ -118,8 +122,8 @@ export default function NewRequestPage() {
 
       toast('Request created successfully!')
       router.push('/')
-    } catch {
-      toast('Failed to create request', 'error')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to create request', 'error')
     } finally {
       setSubmitting(false)
     }

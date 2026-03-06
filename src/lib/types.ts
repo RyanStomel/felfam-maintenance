@@ -8,6 +8,9 @@ export interface Property {
 export interface Vendor {
   id: string
   name: string
+  phone_number: string | null
+  sms_enabled: boolean
+  sms_broadcast: boolean
   active: boolean
   created_at: string
 }

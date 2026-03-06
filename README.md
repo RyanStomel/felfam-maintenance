@@ -45,6 +45,12 @@ cp .env.local.example .env.local
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
+APP_BASE_URL=http://localhost:3000
+TWILIO_ACCOUNT_SID=ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+TWILIO_API_KEY_SID=SKXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+TWILIO_API_KEY_SECRET=YOUR_TWILIO_API_KEY_SECRET
+TWILIO_FROM_NUMBER=+18055909856
 ```
 
 4. Run dev server
@@ -78,6 +84,11 @@ This creates:
 And seeds:
 - Properties: **Oakville, Collinsville, Pointe 44**
 - Vendors: **Jordan, JBR Heating, Lakeside Roofing**
+- Vendor records now also support:
+  - `phone_number`
+  - `sms_enabled`
+  - `sms_broadcast`
+  - `work_logs` table for logged updates
 
 ### 3) Create storage bucket
 In Supabase Dashboard → **Storage**:
@@ -111,9 +122,21 @@ In Vercel Project → **Settings → Domains**:
 
 ---
 
+## SMS notifications
+
+The app now supports Twilio SMS notifications for:
+- new maintenance requests
+- new work log entries
+- status changes
+
+Recipients are pulled from the `vendors` table:
+- assigned vendor receives SMS if `sms_enabled = true`
+- any vendor with `sms_broadcast = true` receives all request/work/status SMS
+
+Phone numbers must be stored in E.164 format. The app also accepts 10-digit US input in Settings and normalizes it before saving.
+
 ## Future enhancements (optional)
 
-- Twilio SMS notifications on create/close/status changes
 - Basic auth or shared PIN gate
 - Monthly cost rollups by property
 - Invoice OCR / receipt extraction
