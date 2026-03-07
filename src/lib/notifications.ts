@@ -192,9 +192,10 @@ export async function sendRequestSmsNotification(
 
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
+      const err = result.reason
       console.error(
         `Failed to send SMS to ${recipients[index]?.name || recipients[index]?.phone_number}`,
-        result.reason
+        err?.message || err
       )
     }
   })

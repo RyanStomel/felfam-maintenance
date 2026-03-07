@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { use, useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -19,6 +19,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { ImageUpload } from '@/components/image-upload'
+import { ConfirmModal } from '@/components/confirm-modal'
 import { createClient } from '@/lib/supabase'
 import { PriorityBadge, StatusBadge } from '@/components/badges'
 import { useToast } from '@/components/toast'
@@ -28,7 +29,12 @@ import type { Request, Property, Vendor, Category, Comment, Attachment, WorkLog,
 
 type Tab = 'details' | 'work' | 'comments' | 'files' | 'status'
 
-export default function RequestDetailPage() {
+export default function RequestDetailPage(props: {
+  params?: Promise<{ id: string }>
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  use(props.params ?? Promise.resolve({ id: '' }))
+  use(props.searchParams ?? Promise.resolve({}))
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const supabase = createClient()
@@ -65,6 +71,9 @@ export default function RequestDetailPage() {
   // Comment state
   const [commentAuthor, setCommentAuthor] = useState('')
   const [commentBody, setCommentBody] = useState('')
+
+  // Delete confirmation
+  const [attachmentToDelete, setAttachmentToDelete] = useState<Attachment | null>(null)
 
   const fetchRequest = useCallback(async () => {
     const { data } = await supabase
@@ -262,10 +271,15 @@ export default function RequestDetailPage() {
     fetchAttachments()
   }
 
-  const deleteAttachment = async (att: Attachment) => {
-    if (!confirm(`Delete ${att.file_name}?`)) return
-    await supabase.from('attachments').delete().eq('id', att.id)
+  function openDeleteAttachmentModal(att: Attachment) {
+    setAttachmentToDelete(att)
+  }
+
+  async function executeDeleteAttachment() {
+    if (!attachmentToDelete) return
+    await supabase.from('attachments').delete().eq('id', attachmentToDelete.id)
     toast('Attachment deleted')
+    setAttachmentToDelete(null)
     fetchAttachments()
   }
 
@@ -701,7 +715,7 @@ export default function RequestDetailPage() {
                           )}
                         </a>
                         <button
-                          onClick={() => deleteAttachment(att)}
+                          onClick={() => openDeleteAttachmentModal(att)}
                           className="p-1.5 rounded hover:bg-red-50"
                         >
                           <Trash2 className="w-3.5 h-3.5 text-red-400" />
@@ -764,6 +778,14 @@ export default function RequestDetailPage() {
           )}
         </div>
       )}
+
+      <ConfirmModal
+        open={!!attachmentToDelete}
+        onClose={() => setAttachmentToDelete(null)}
+        onConfirm={executeDeleteAttachment}
+        title={attachmentToDelete ? `Delete ${attachmentToDelete.file_name}?` : ''}
+        message="This cannot be undone."
+      />
     </div>
   )
 }

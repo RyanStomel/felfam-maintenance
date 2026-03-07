@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -33,7 +33,10 @@ const priorities: { value: Priority; label: string; color: string }[] = [
   { value: 'urgent', label: 'Urgent', color: 'bg-red-100 text-red-800 border-red-300' },
 ]
 
-export default function NewRequestPage() {
+export default function NewRequestPage(props: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  use(props.searchParams ?? Promise.resolve({}))
   const supabase = createClient()
   const router = useRouter()
   const { toast } = useToast()

@@ -52,7 +52,11 @@ export async function POST(request: Request) {
       throw error || new Error('Failed to create request')
     }
 
-    await sendRequestSmsNotification(data.id, { type: 'request_created' })
+    try {
+      await sendRequestSmsNotification(data.id, { type: 'request_created' })
+    } catch (smsError) {
+      console.warn('SMS notification failed (request created successfully)', smsError)
+    }
 
     return NextResponse.json({ request: data }, { status: 201 })
   } catch (error) {

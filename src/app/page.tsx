@@ -1,15 +1,18 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { use, useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Plus, Filter, ArrowUpDown, Building2, User, Clock } from 'lucide-react'
+import { Plus, Filter, ArrowUpDown, Building2, User, Users, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { PriorityBadge, StatusBadge } from '@/components/badges'
 import { differenceInDays } from 'date-fns'
 import { clsx } from 'clsx'
 import type { Request, Property, Vendor } from '@/lib/types'
 
-export default function Dashboard() {
+export default function Dashboard(props: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  use(props.searchParams ?? Promise.resolve({}))
   const supabase = createClient()
   const [requests, setRequests] = useState<Request[]>([])
   const [properties, setProperties] = useState<Property[]>([])
@@ -208,6 +211,12 @@ export default function Dashboard() {
                   <span className="flex items-center gap-1">
                     <Building2 className="w-3.5 h-3.5" />
                     {req.properties.name}
+                  </span>
+                )}
+                {req.tenant_name && (
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" />
+                    {req.tenant_name}
                   </span>
                 )}
                 {req.vendors && (

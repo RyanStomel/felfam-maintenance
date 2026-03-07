@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { use, useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/toast'
 import {
@@ -10,10 +10,13 @@ import {
   Plus,
   Pencil,
   Power,
+  Trash2,
   MessageSquare,
   Phone,
 } from 'lucide-react'
 import { formatPhoneNumberDisplay, normalizePhoneNumber, PHONE_NUMBER_ERROR } from '@/lib/phone'
+import { ConfirmModal } from '@/components/confirm-modal'
+import { InfoBubble } from '@/components/info-bubble'
 import type { Vendor } from '@/lib/types'
 
 type SimpleItem = {
@@ -38,7 +41,10 @@ const emptyVendorForm: VendorFormState = {
   smsBroadcast: false,
 }
 
-export default function SettingsPage() {
+export default function SettingsPage(props: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  use(props.searchParams ?? Promise.resolve({}))
   const supabase = createClient()
   const { toast } = useToast()
 
@@ -58,6 +64,9 @@ export default function SettingsPage() {
   } | null>(null)
   const [editingVendorId, setEditingVendorId] = useState<string | null>(null)
   const [editingVendor, setEditingVendor] = useState<VendorFormState>(emptyVendorForm)
+  const [confirmDelete, setConfirmDelete] = useState<
+    { type: 'vendor'; item: Vendor } | { type: 'category'; item: SimpleItem } | null
+  >(null)
 
   useEffect(() => {
     loadAll()
@@ -116,13 +125,14 @@ export default function SettingsPage() {
       return null
     }
 
-    return {
+    const payload = {
       name,
       phone_number: phoneNumber,
       sms_enabled: form.smsEnabled || form.smsBroadcast,
       sms_broadcast: form.smsBroadcast,
       active: true,
     }
+    return payload
   }
 
   async function addVendor() {
@@ -131,7 +141,7 @@ export default function SettingsPage() {
 
     const { error } = await supabase.from('vendors').insert(payload)
     if (error) {
-      toast('Failed to add vendor', 'error')
+      toast(`Failed to add vendor: ${error.message}`, 'error')
       return
     }
 
@@ -205,6 +215,34 @@ export default function SettingsPage() {
     loadAll()
   }
 
+  function openDeleteVendorModal(vendor: Vendor) {
+    setConfirmDelete({ type: 'vendor', item: vendor })
+  }
+
+  function openDeleteCategoryModal(item: SimpleItem) {
+    setConfirmDelete({ type: 'category', item })
+  }
+
+  async function executeDelete() {
+    if (!confirmDelete) return
+    if (confirmDelete.type === 'vendor') {
+      const { error } = await supabase.from('vendors').delete().eq('id', confirmDelete.item.id)
+      if (error) {
+        toast(`Failed to delete vendor: ${error.message}`, 'error')
+        return
+      }
+      toast(`${confirmDelete.item.name} deleted`)
+    } else {
+      const { error } = await supabase.from('categories').delete().eq('id', confirmDelete.item.id)
+      if (error) {
+        toast(`Failed to delete category: ${error.message}`, 'error')
+        return
+      }
+      toast(`${confirmDelete.item.name} deleted`)
+    }
+    loadAll()
+  }
+
   if (loading) {
     return (
       <div className="px-4 py-6 max-w-3xl mx-auto">
@@ -255,6 +293,7 @@ export default function SettingsPage() {
           setEditingVendor(emptyVendorForm)
         }}
         onToggle={(vendor) => toggleActive('vendors', vendor)}
+        onDelete={openDeleteVendorModal}
       />
 
       <SimpleSection
@@ -273,6 +312,15 @@ export default function SettingsPage() {
         onSave={saveSimpleEdit}
         onCancel={() => setEditingSimple(null)}
         onToggle={(item) => toggleActive('categories', item)}
+        onDelete={openDeleteCategoryModal}
+      />
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={executeDelete}
+        title={confirmDelete ? `Delete ${confirmDelete.item.name}?` : ''}
+        message="This cannot be undone."
       />
     </div>
   )
@@ -292,6 +340,7 @@ function SimpleSection({
   onSave,
   onCancel,
   onToggle,
+  onDelete,
 }: {
   icon: ReactNode
   title: string
@@ -306,6 +355,7 @@ function SimpleSection({
   onSave: () => void
   onCancel: () => void
   onToggle: (item: SimpleItem) => void
+  onDelete?: (item: SimpleItem) => void
 }) {
   return (
     <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
@@ -388,6 +438,15 @@ function SimpleSection({
               >
                 <Power className={`w-4 h-4 ${item.active ? 'text-green-600' : 'text-gray-400'}`} />
               </button>
+              {onDelete && (
+                <button
+                  onClick={() => onDelete(item)}
+                  className="p-2 rounded-lg hover:bg-red-50 min-h-[40px] min-w-[40px] inline-flex items-center justify-center"
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -408,6 +467,7 @@ function VendorsSection({
   onSave,
   onCancel,
   onToggle,
+  onDelete,
 }: {
   vendors: Vendor[]
   newVendor: VendorFormState
@@ -420,6 +480,7 @@ function VendorsSection({
   onSave: (id: string) => void
   onCancel: () => void
   onToggle: (vendor: Vendor) => void
+  onDelete: (vendor: Vendor) => void
 }) {
   return (
     <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4">
@@ -508,6 +569,13 @@ function VendorsSection({
                           className={`w-4 h-4 ${vendor.active ? 'text-green-600' : 'text-gray-400'}`}
                         />
                       </button>
+                      <button
+                        onClick={() => onDelete(vendor)}
+                        className="p-2 rounded-lg hover:bg-red-50 min-h-[40px] min-w-[40px] inline-flex items-center justify-center"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </button>
                     </div>
                   </div>
                 )}
@@ -566,7 +634,8 @@ function VendorEditor({
             }
             className="h-4 w-4 rounded border-gray-300"
           />
-          <span className="text-sm text-gray-700">Enable SMS for assigned updates</span>
+          <span className="text-sm text-gray-700 flex-1">Enable SMS for assigned updates</span>
+          <InfoBubble content="This person receives SMS notifications only when they are assigned to a request. They'll get alerts for new requests, work log entries, and status changes—but only for requests they're working on." />
         </label>
         <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">
           <input
@@ -581,7 +650,8 @@ function VendorEditor({
             }
             className="h-4 w-4 rounded border-gray-300"
           />
-          <span className="text-sm text-gray-700">Send all request/work/status SMS</span>
+          <span className="text-sm text-gray-700 flex-1">Send all request/work/status SMS</span>
+          <InfoBubble content="This person receives SMS for every request in the system—new requests, work updates, and status changes—regardless of who is assigned. Use for managers or coordinators who need full visibility." />
         </label>
       </div>
       <div className="flex gap-2">
