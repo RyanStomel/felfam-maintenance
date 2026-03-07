@@ -8,7 +8,11 @@ export function normalizePhoneNumber(value: string | null | undefined) {
   const digits = input.replace(/\D/g, '')
 
   if (input.startsWith('+')) {
-    if (digits.length >= 10 && digits.length <= 15) {
+    if (
+      digits.length >= 10 &&
+      digits.length <= 15 &&
+      /^[1-9]/.test(digits)
+    ) {
       return `+${digits}`
     }
     return null
