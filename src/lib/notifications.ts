@@ -1,4 +1,5 @@
 import twilio from 'twilio'
+import { isValidPhoneNumber } from 'libphonenumber-js'
 import type { Status } from '@/lib/types'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { normalizePhoneNumber } from '@/lib/phone'
@@ -172,16 +173,35 @@ export async function sendRequestSmsNotification(
   event: NotificationEvent
 ) {
   const twilioConfig = createTwilioClient()
-  if (!twilioConfig) return
+  if (!twilioConfig) {
+    console.warn('[SMS] Skipped: Twilio not configured (missing env vars)')
+    return
+  }
 
   const request = await fetchRequestWithJoins(requestId)
   const recipients = await fetchRecipients(request.assigned_to)
-  if (recipients.length === 0) return
+  if (recipients.length === 0) {
+    console.warn('[SMS] Skipped: No recipients (no vendors with sms_enabled)')
+    return
+  }
 
   const body = buildMessage(request, event)
 
+  const validRecipients = recipients.filter((r) => {
+    if (isValidPhoneNumber(r.phone_number)) return true
+    console.warn(
+      `[SMS] Skipped invalid number for ${r.name} (${r.phone_number}): not valid E.164 for Twilio`
+    )
+    return false
+  })
+
+  if (validRecipients.length === 0) {
+    console.warn('[SMS] No valid recipient numbers after validation')
+    return
+  }
+
   const results = await Promise.allSettled(
-    recipients.map((recipient) =>
+    validRecipients.map((recipient) =>
       twilioConfig.client.messages.create({
         from: twilioConfig.from,
         to: recipient.phone_number,
@@ -193,10 +213,11 @@ export async function sendRequestSmsNotification(
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
       const err = result.reason
-      console.error(
-        `Failed to send SMS to ${recipients[index]?.name || recipients[index]?.phone_number}`,
-        err?.message || err
-      )
+      const recipient = validRecipients[index]?.name || validRecipients[index]?.phone_number
+      console.error(`[SMS] Failed to send to ${recipient}:`, err?.message || err)
+      if (err && typeof err === 'object' && 'code' in err) {
+        console.error('[SMS] Twilio error code:', (err as { code?: number }).code)
+      }
     }
   })
 }
