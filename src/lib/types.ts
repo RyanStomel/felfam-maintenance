@@ -44,6 +44,7 @@ export interface Request {
   properties?: Property | null
   vendors?: Vendor | null
   categories?: Category | null
+  comments?: { count: number }[]
 }
 
 export interface Comment {

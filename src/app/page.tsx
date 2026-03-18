@@ -2,18 +2,34 @@
 
 import { use, useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Plus, Filter, ArrowUpDown, Building2, User, Users, Clock } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Plus, Filter, ArrowUpDown, Building2, User, Users, Clock, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
-import { PriorityBadge, StatusBadge } from '@/components/badges'
-import { differenceInDays } from 'date-fns'
+import { PriorityBadge } from '@/components/badges'
+import { differenceInDays, formatDistanceToNow } from 'date-fns'
 import { clsx } from 'clsx'
-import type { Request, Property, Vendor } from '@/lib/types'
+import type { Request, Property, Vendor, Comment, Status } from '@/lib/types'
+
+const statusOptions: { value: Status; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'waiting', label: 'Waiting' },
+  { value: 'closed', label: 'Closed' },
+]
+
+const statusStyles: Record<Status, string> = {
+  open: 'bg-blue-100 text-blue-800 border-blue-200',
+  in_progress: 'bg-purple-100 text-purple-800 border-purple-200',
+  waiting: 'bg-amber-100 text-amber-800 border-amber-200',
+  closed: 'bg-green-100 text-green-800 border-green-200',
+}
 
 export default function Dashboard(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   use(props.searchParams ?? Promise.resolve({}))
   const supabase = createClient()
+  const router = useRouter()
   const [requests, setRequests] = useState<Request[]>([])
   const [properties, setProperties] = useState<Property[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
@@ -27,12 +43,17 @@ export default function Dashboard(props: {
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'priority'>('newest')
 
+  // Expandable comments
+  const [expandedComments, setExpandedComments] = useState<Record<string, Comment[]>>({})
+  const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({})
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
   useEffect(() => {
     async function fetchData() {
       const [reqRes, propRes, vendRes] = await Promise.all([
         supabase
           .from('requests')
-          .select('*, properties(*), vendors(*), categories(*)')
+          .select('*, properties(*), vendors(*), categories(*), comments(count)')
           .order('created_at', { ascending: false }),
         supabase.from('properties').select('*').eq('active', true).order('name'),
         supabase.from('vendors').select('*').eq('active', true).order('name'),
@@ -76,6 +97,69 @@ export default function Dashboard(props: {
   }, [requests, filterProperty, filterAssignee, filterPriority, filterStatus, sortBy])
 
   const daysOpen = (createdAt: string) => differenceInDays(new Date(), new Date(createdAt))
+
+  const getCommentCount = (req: Request) => {
+    if (req.comments && req.comments.length > 0) return req.comments[0].count
+    return 0
+  }
+
+  const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>, req: Request) => {
+    e.stopPropagation()
+    const newStatus = e.target.value as Status
+    if (newStatus === req.status) return
+
+    // Optimistic update
+    setRequests((prev) =>
+      prev.map((r) =>
+        r.id === req.id
+          ? { ...r, status: newStatus, closed_at: newStatus === 'closed' ? new Date().toISOString() : null }
+          : r
+      )
+    )
+
+    const update: Record<string, unknown> = {
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+    }
+    if (newStatus === 'closed') {
+      update.closed_at = new Date().toISOString()
+    } else {
+      update.closed_at = null
+    }
+
+    const { error } = await supabase.from('requests').update(update).eq('id', req.id)
+    if (error) {
+      // Revert on error
+      setRequests((prev) =>
+        prev.map((r) => (r.id === req.id ? req : r))
+      )
+    }
+  }
+
+  const toggleComments = async (reqId: string) => {
+    if (expandedIds.has(reqId)) {
+      setExpandedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(reqId)
+        return next
+      })
+      return
+    }
+
+    setExpandedIds((prev) => new Set(prev).add(reqId))
+
+    // Lazy fetch if not already loaded
+    if (!expandedComments[reqId]) {
+      setLoadingComments((prev) => ({ ...prev, [reqId]: true }))
+      const { data } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('request_id', reqId)
+        .order('created_at', { ascending: false })
+      setExpandedComments((prev) => ({ ...prev, [reqId]: (data as Comment[]) || [] }))
+      setLoadingComments((prev) => ({ ...prev, [reqId]: false }))
+    }
+  }
 
   if (loading) {
     return (
@@ -194,47 +278,124 @@ export default function Dashboard(props: {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((req) => (
-            <Link
-              key={req.id}
-              href={`/requests/${req.id}`}
-              className="block bg-white rounded-xl shadow-sm border border-gray-100 p-4 active:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <h3 className="font-semibold text-gray-900 text-base leading-tight">
-                  {req.title}
-                </h3>
-                <PriorityBadge priority={req.priority} />
-              </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
-                {req.properties && (
-                  <span className="flex items-center gap-1">
-                    <Building2 className="w-3.5 h-3.5" />
-                    {req.properties.name}
-                  </span>
+          {filtered.map((req) => {
+            const commentCount = getCommentCount(req)
+            const isExpanded = expandedIds.has(req.id)
+            const commentsData = expandedComments[req.id]
+            const isLoadingComments = loadingComments[req.id]
+            return (
+              <div key={req.id}>
+                <div
+                  onClick={() => router.push(`/requests/${req.id}`)}
+                  className={clsx(
+                    'bg-white rounded-xl shadow-sm border border-gray-100 p-4 active:bg-gray-50 transition-colors cursor-pointer',
+                    isExpanded && 'rounded-b-none'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h3 className="font-semibold text-gray-900 text-base leading-tight">
+                      {req.title}
+                    </h3>
+                    <PriorityBadge priority={req.priority} />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
+                    {req.properties && (
+                      <span className="flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5" />
+                        {req.properties.name}
+                      </span>
+                    )}
+                    {req.tenant_name && (
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" />
+                        {req.tenant_name}
+                      </span>
+                    )}
+                    {req.vendors && (
+                      <span className="flex items-center gap-1">
+                        <User className="w-3.5 h-3.5" />
+                        {req.vendors.name}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      {daysOpen(req.created_at)}d open
+                    </span>
+                    {commentCount > 0 && (
+                      <span className="flex items-center gap-1">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        {commentCount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <select
+                      value={req.status}
+                      onChange={(e) => handleStatusChange(e, req)}
+                      onClick={(e) => e.stopPropagation()}
+                      className={clsx(
+                        'text-xs font-semibold rounded-full px-2.5 py-1 border appearance-none cursor-pointer pr-6',
+                        statusStyles[req.status]
+                      )}
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 6px center',
+                      }}
+                    >
+                      {statusOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="ml-auto">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleComments(req.id)
+                        }}
+                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 min-h-[32px]"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        {isExpanded ? (
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {/* Expanded comments panel */}
+                {isExpanded && (
+                  <div className="bg-gray-50 border border-t-0 border-gray-200 rounded-b-xl px-4 py-3">
+                    {isLoadingComments ? (
+                      <div className="flex items-center justify-center py-3">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-navy" />
+                      </div>
+                    ) : commentsData && commentsData.length > 0 ? (
+                      <div className="space-y-2">
+                        {commentsData.map((c) => (
+                          <div key={c.id} className="bg-white rounded-lg p-2.5 border border-gray-100">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="font-semibold text-xs text-gray-900">{c.author_name}</span>
+                              <span className="text-xs text-gray-400">
+                                {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.body}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 text-center py-2">No comments yet</p>
+                    )}
+                  </div>
                 )}
-                {req.tenant_name && (
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" />
-                    {req.tenant_name}
-                  </span>
-                )}
-                {req.vendors && (
-                  <span className="flex items-center gap-1">
-                    <User className="w-3.5 h-3.5" />
-                    {req.vendors.name}
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  {daysOpen(req.created_at)}d open
-                </span>
               </div>
-              <div className="mt-2">
-                <StatusBadge status={req.status} />
-              </div>
-            </Link>
-          ))}
+            )
+          })}
         </div>
       )}
 
