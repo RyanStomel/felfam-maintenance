@@ -1,9 +1,9 @@
 'use client'
 
-import { use, useEffect, useState, useMemo } from 'react'
+import { use, useEffect, useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Filter, ArrowUpDown, Building2, User, Users, Clock, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Filter, ArrowUpDown, Building2, User, Users, Clock, MessageSquare, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { PriorityBadge } from '@/components/badges'
 import { differenceInDays, formatDistanceToNow } from 'date-fns'
@@ -48,6 +48,12 @@ export default function Dashboard(props: {
   const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({})
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
+  // Close modal
+  const [closeModal, setCloseModal] = useState<{ req: Request } | null>(null)
+  const [closeComment, setCloseComment] = useState('')
+  const [closingId, setClosingId] = useState<string | null>(null)
+  const closeTextareaRef = useRef<HTMLTextAreaElement>(null)
+
   useEffect(() => {
     async function fetchData() {
       const [reqRes, propRes, vendRes] = await Promise.all([
@@ -76,7 +82,10 @@ export default function Dashboard(props: {
   const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 }
 
   const filtered = useMemo(() => {
-    let list = requests.filter((r) => r.status !== 'closed')
+    // Default: hide closed. Show closed only when explicitly filtered.
+    let list = filterStatus === 'closed'
+      ? [...requests]
+      : requests.filter((r) => r.status !== 'closed')
     if (filterProperty) list = list.filter((r) => r.property_id === filterProperty)
     if (filterAssignee) list = list.filter((r) => r.assigned_to === filterAssignee)
     if (filterPriority) list = list.filter((r) => r.priority === filterPriority)
@@ -108,6 +117,18 @@ export default function Dashboard(props: {
     const newStatus = e.target.value as Status
     if (newStatus === req.status) return
 
+    // Closing requires a comment — show modal
+    if (newStatus === 'closed') {
+      setCloseComment('')
+      setCloseModal({ req })
+      setTimeout(() => closeTextareaRef.current?.focus(), 50)
+      return
+    }
+
+    await applyStatusChange(req, newStatus)
+  }
+
+  const applyStatusChange = async (req: Request, newStatus: Status, comment?: string) => {
     // Optimistic update
     setRequests((prev) =>
       prev.map((r) =>
@@ -120,20 +141,47 @@ export default function Dashboard(props: {
     const update: Record<string, unknown> = {
       status: newStatus,
       updated_at: new Date().toISOString(),
-    }
-    if (newStatus === 'closed') {
-      update.closed_at = new Date().toISOString()
-    } else {
-      update.closed_at = null
+      closed_at: newStatus === 'closed' ? new Date().toISOString() : null,
     }
 
     const { error } = await supabase.from('requests').update(update).eq('id', req.id)
     if (error) {
-      // Revert on error
-      setRequests((prev) =>
-        prev.map((r) => (r.id === req.id ? req : r))
-      )
+      setRequests((prev) => prev.map((r) => (r.id === req.id ? req : r)))
+      return
     }
+
+    if (comment?.trim()) {
+      const { data: newComment } = await supabase
+        .from('comments')
+        .insert({ request_id: req.id, author_name: 'Ryan', body: comment.trim() })
+        .select()
+        .single()
+
+      if (newComment) {
+        // Update comment count optimistically
+        setRequests((prev) =>
+          prev.map((r) => {
+            if (r.id !== req.id) return r
+            const currentCount = r.comments?.[0]?.count ?? 0
+            return { ...r, comments: [{ count: currentCount + 1 }] }
+          })
+        )
+        // Append to expanded comments if open
+        setExpandedComments((prev) => ({
+          ...prev,
+          [req.id]: [newComment as Comment, ...(prev[req.id] || [])],
+        }))
+      }
+    }
+  }
+
+  const handleCloseConfirm = async () => {
+    if (!closeModal || !closeComment.trim()) return
+    setClosingId(closeModal.req.id)
+    await applyStatusChange(closeModal.req, 'closed', closeComment)
+    setClosingId(null)
+    setCloseModal(null)
+    setCloseComment('')
   }
 
   const toggleComments = async (reqId: string) => {
@@ -262,10 +310,11 @@ export default function Dashboard(props: {
             onChange={(e) => setFilterStatus(e.target.value)}
             className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm min-h-[44px]"
           >
-            <option value="">All Statuses</option>
+            <option value="">Active (excl. Closed)</option>
             <option value="open">Open</option>
             <option value="in_progress">In Progress</option>
             <option value="waiting">Waiting</option>
+            <option value="closed">Closed</option>
           </select>
         </div>
       )}
@@ -403,6 +452,51 @@ export default function Dashboard(props: {
       >
         <Plus className="w-7 h-7" />
       </Link>
+
+      {/* Close Task Modal */}
+      {closeModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0"
+          onClick={() => setCloseModal(null)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-gray-900">Close Task</h2>
+              <button onClick={() => setCloseModal(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mb-1 font-medium truncate">{closeModal.req.title}</p>
+            <p className="text-xs text-gray-400 mb-3">A closing comment is required before marking this task as closed.</p>
+            <textarea
+              ref={closeTextareaRef}
+              value={closeComment}
+              onChange={(e) => setCloseComment(e.target.value)}
+              placeholder="Describe what was done to resolve this task..."
+              rows={4}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy"
+            />
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => setCloseModal(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCloseConfirm}
+                disabled={!closeComment.trim() || closingId === closeModal.req.id}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-green-700 transition-colors"
+              >
+                {closingId === closeModal.req.id ? 'Closing…' : 'Close Task'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
