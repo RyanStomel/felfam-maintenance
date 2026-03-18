@@ -321,12 +321,6 @@ export default function Dashboard(props: {
                       <Clock className="w-3.5 h-3.5" />
                       {daysOpen(req.created_at)}d open
                     </span>
-                    {commentCount > 0 && (
-                      <span className="flex items-center gap-1">
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        {commentCount}
-                      </span>
-                    )}
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     <select
@@ -358,6 +352,9 @@ export default function Dashboard(props: {
                         className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 min-h-[32px]"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />
+                        {commentCount > 0 && (
+                          <span className="font-medium text-gray-500">{commentCount}</span>
+                        )}
                         {isExpanded ? (
                           <ChevronUp className="w-3.5 h-3.5" />
                         ) : (
