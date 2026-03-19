@@ -3,7 +3,7 @@
 import { use, useEffect, useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Filter, ArrowUpDown, Building2, User, Users, Clock, MessageSquare, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Plus, Filter, ArrowUpDown, Building2, User, Users, Clock, MessageSquare, ChevronDown, ChevronUp, X, Send } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { PriorityBadge } from '@/components/badges'
 import { differenceInDays, formatDistanceToNow } from 'date-fns'
@@ -47,6 +47,10 @@ export default function Dashboard(props: {
   const [expandedComments, setExpandedComments] = useState<Record<string, Comment[]>>({})
   const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({})
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  // Inline comment input per request
+  const [inlineCommentText, setInlineCommentText] = useState<Record<string, string>>({})
+  const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({})
 
   // Close modal
   const [closeModal, setCloseModal] = useState<{ req: Request } | null>(null)
@@ -173,6 +177,35 @@ export default function Dashboard(props: {
         }))
       }
     }
+  }
+
+  const handleAddComment = async (reqId: string) => {
+    const text = inlineCommentText[reqId]?.trim()
+    if (!text) return
+    setSubmittingComment((prev) => ({ ...prev, [reqId]: true }))
+
+    const { data: newComment } = await supabase
+      .from('comments')
+      .insert({ request_id: reqId, author_name: 'Ryan', body: text })
+      .select()
+      .single()
+
+    if (newComment) {
+      setExpandedComments((prev) => ({
+        ...prev,
+        [reqId]: [newComment as Comment, ...(prev[reqId] || [])],
+      }))
+      setRequests((prev) =>
+        prev.map((r) => {
+          if (r.id !== reqId) return r
+          const currentCount = r.comments?.[0]?.count ?? 0
+          return { ...r, comments: [{ count: currentCount + 1 }] }
+        })
+      )
+      setInlineCommentText((prev) => ({ ...prev, [reqId]: '' }))
+    }
+
+    setSubmittingComment((prev) => ({ ...prev, [reqId]: false }))
   }
 
   const handleCloseConfirm = async () => {
@@ -437,6 +470,31 @@ export default function Dashboard(props: {
                     ) : (
                       <p className="text-xs text-gray-400 text-center py-2">No comments yet</p>
                     )}
+                    {/* Inline add comment */}
+                    <div className="flex items-end gap-2 mt-3 pt-3 border-t border-gray-200">
+                      <textarea
+                        value={inlineCommentText[req.id] || ''}
+                        onChange={(e) =>
+                          setInlineCommentText((prev) => ({ ...prev, [req.id]: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            handleAddComment(req.id)
+                          }
+                        }}
+                        placeholder="Add a comment…"
+                        rows={1}
+                        className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy bg-white"
+                      />
+                      <button
+                        onClick={() => handleAddComment(req.id)}
+                        disabled={!inlineCommentText[req.id]?.trim() || submittingComment[req.id]}
+                        className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-navy text-white disabled:opacity-40 hover:bg-navy/90 transition-colors"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
