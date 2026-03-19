@@ -51,6 +51,13 @@ export default function Dashboard(props: {
   // Inline comment input per request
   const [inlineCommentText, setInlineCommentText] = useState<Record<string, string>>({})
   const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({})
+  const [commentAuthorName, setCommentAuthorName] = useState<string>('')
+
+  // Load remembered author name from localStorage
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('felfam_comment_author') : ''
+    if (saved) setCommentAuthorName(saved)
+  }, [])
 
   // Close modal
   const [closeModal, setCloseModal] = useState<{ req: Request } | null>(null)
@@ -181,12 +188,16 @@ export default function Dashboard(props: {
 
   const handleAddComment = async (reqId: string) => {
     const text = inlineCommentText[reqId]?.trim()
+    const author = commentAuthorName.trim() || 'Unknown'
     if (!text) return
     setSubmittingComment((prev) => ({ ...prev, [reqId]: true }))
 
+    // Persist author name for next time
+    localStorage.setItem('felfam_comment_author', author)
+
     const { data: newComment } = await supabase
       .from('comments')
-      .insert({ request_id: reqId, author_name: 'Ryan', body: text })
+      .insert({ request_id: reqId, author_name: author, body: text })
       .select()
       .single()
 
@@ -471,29 +482,53 @@ export default function Dashboard(props: {
                       <p className="text-xs text-gray-400 text-center py-2">No comments yet</p>
                     )}
                     {/* Inline add comment */}
-                    <div className="flex items-end gap-2 mt-3 pt-3 border-t border-gray-200">
-                      <textarea
-                        value={inlineCommentText[req.id] || ''}
-                        onChange={(e) =>
-                          setInlineCommentText((prev) => ({ ...prev, [req.id]: e.target.value }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            handleAddComment(req.id)
+                    <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                      {!commentAuthorName && (
+                        <input
+                          value={commentAuthorName}
+                          onChange={(e) => setCommentAuthorName(e.target.value)}
+                          placeholder="Your name (saved for next time)"
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy bg-white"
+                        />
+                      )}
+                      {commentAuthorName ? (
+                        <p className="text-xs text-gray-400">
+                          Commenting as <span className="font-semibold text-gray-600">{commentAuthorName}</span>{' '}
+                          <button
+                            onClick={() => {
+                              setCommentAuthorName('')
+                              localStorage.removeItem('felfam_comment_author')
+                            }}
+                            className="text-navy underline"
+                          >
+                            change
+                          </button>
+                        </p>
+                      ) : null}
+                      <div className="flex items-end gap-2">
+                        <textarea
+                          value={inlineCommentText[req.id] || ''}
+                          onChange={(e) =>
+                            setInlineCommentText((prev) => ({ ...prev, [req.id]: e.target.value }))
                           }
-                        }}
-                        placeholder="Add a comment…"
-                        rows={1}
-                        className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy bg-white"
-                      />
-                      <button
-                        onClick={() => handleAddComment(req.id)}
-                        disabled={!inlineCommentText[req.id]?.trim() || submittingComment[req.id]}
-                        className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-navy text-white disabled:opacity-40 hover:bg-navy/90 transition-colors"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              handleAddComment(req.id)
+                            }
+                          }}
+                          placeholder="Add a comment…"
+                          rows={1}
+                          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy bg-white"
+                        />
+                        <button
+                          onClick={() => handleAddComment(req.id)}
+                          disabled={!inlineCommentText[req.id]?.trim() || submittingComment[req.id]}
+                          className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-navy text-white disabled:opacity-40 hover:bg-navy/90 transition-colors"
+                        >
+                          <Send className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

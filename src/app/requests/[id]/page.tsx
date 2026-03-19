@@ -72,6 +72,12 @@ export default function RequestDetailPage(props: {
   const [commentAuthor, setCommentAuthor] = useState('')
   const [commentBody, setCommentBody] = useState('')
 
+  // Load remembered author name from localStorage
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('felfam_comment_author') : ''
+    if (saved) setCommentAuthor(saved)
+  }, [])
+
   // Delete confirmation
   const [attachmentToDelete, setAttachmentToDelete] = useState<Attachment | null>(null)
 
@@ -209,6 +215,8 @@ export default function RequestDetailPage(props: {
 
   const addComment = async () => {
     if (!commentAuthor.trim() || !commentBody.trim()) return
+    // Persist author name for next time
+    localStorage.setItem('felfam_comment_author', commentAuthor.trim())
     const { error } = await supabase.from('comments').insert({
       request_id: id,
       author_name: commentAuthor.trim(),
@@ -627,12 +635,27 @@ export default function RequestDetailPage(props: {
             </div>
           )}
           <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-2">
-            <input
-              value={commentAuthor}
-              onChange={(e) => setCommentAuthor(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm min-h-[44px]"
-              placeholder="Your name"
-            />
+            {commentAuthor ? (
+              <p className="text-xs text-gray-400">
+                Commenting as <span className="font-semibold text-gray-600">{commentAuthor}</span>{' '}
+                <button
+                  onClick={() => {
+                    setCommentAuthor('')
+                    localStorage.removeItem('felfam_comment_author')
+                  }}
+                  className="text-navy underline"
+                >
+                  change
+                </button>
+              </p>
+            ) : (
+              <input
+                value={commentAuthor}
+                onChange={(e) => setCommentAuthor(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm min-h-[44px]"
+                placeholder="Your name (saved for next time)"
+              />
+            )}
             <textarea
               value={commentBody}
               onChange={(e) => setCommentBody(e.target.value)}
