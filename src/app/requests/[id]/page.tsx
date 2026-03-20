@@ -70,12 +70,16 @@ export default function RequestDetailPage(props: {
 
   // Comment state
   const [commentAuthor, setCommentAuthor] = useState('')
+  const [commentAuthorSaved, setCommentAuthorSaved] = useState(false)
   const [commentBody, setCommentBody] = useState('')
 
   // Load remembered author name from localStorage
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('felfam_comment_author') : ''
-    if (saved) setCommentAuthor(saved)
+    if (saved) {
+      setCommentAuthor(saved)
+      setCommentAuthorSaved(true)
+    }
   }, [])
 
   // Delete confirmation
@@ -217,6 +221,7 @@ export default function RequestDetailPage(props: {
     if (!commentAuthor.trim() || !commentBody.trim()) return
     // Persist author name for next time
     localStorage.setItem('felfam_comment_author', commentAuthor.trim())
+    setCommentAuthorSaved(true)
     const { error } = await supabase.from('comments').insert({
       request_id: id,
       author_name: commentAuthor.trim(),
@@ -635,12 +640,13 @@ export default function RequestDetailPage(props: {
             </div>
           )}
           <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-2">
-            {commentAuthor ? (
+            {commentAuthorSaved ? (
               <p className="text-xs text-gray-400">
                 Commenting as <span className="font-semibold text-gray-600">{commentAuthor}</span>{' '}
                 <button
                   onClick={() => {
                     setCommentAuthor('')
+                    setCommentAuthorSaved(false)
                     localStorage.removeItem('felfam_comment_author')
                   }}
                   className="text-navy underline"
