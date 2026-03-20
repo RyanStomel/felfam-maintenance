@@ -658,6 +658,13 @@ export default function RequestDetailPage(props: {
               <input
                 value={commentAuthor}
                 onChange={(e) => setCommentAuthor(e.target.value)}
+                onBlur={() => {
+                  const name = commentAuthor.trim()
+                  if (name) {
+                    localStorage.setItem('felfam_comment_author', name)
+                    setCommentAuthorSaved(true)
+                  }
+                }}
                 className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm min-h-[44px]"
                 placeholder="Your name (saved for next time)"
               />

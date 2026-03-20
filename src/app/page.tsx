@@ -52,11 +52,15 @@ export default function Dashboard(props: {
   const [inlineCommentText, setInlineCommentText] = useState<Record<string, string>>({})
   const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({})
   const [commentAuthorName, setCommentAuthorName] = useState<string>('')
+  const [commentAuthorSaved, setCommentAuthorSaved] = useState(false)
 
   // Load remembered author name from localStorage
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('felfam_comment_author') : ''
-    if (saved) setCommentAuthorName(saved)
+    if (saved) {
+      setCommentAuthorName(saved)
+      setCommentAuthorSaved(true)
+    }
   }, [])
 
   // Close modal
@@ -194,6 +198,7 @@ export default function Dashboard(props: {
 
     // Persist author name for next time
     localStorage.setItem('felfam_comment_author', author)
+    setCommentAuthorSaved(true)
 
     const { data: newComment } = await supabase
       .from('comments')
@@ -483,20 +488,28 @@ export default function Dashboard(props: {
                     )}
                     {/* Inline add comment */}
                     <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                      {!commentAuthorName && (
+                      {!commentAuthorSaved && (
                         <input
                           value={commentAuthorName}
                           onChange={(e) => setCommentAuthorName(e.target.value)}
+                          onBlur={() => {
+                            const name = commentAuthorName.trim()
+                            if (name) {
+                              localStorage.setItem('felfam_comment_author', name)
+                              setCommentAuthorSaved(true)
+                            }
+                          }}
                           placeholder="Your name (saved for next time)"
                           className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy bg-white"
                         />
                       )}
-                      {commentAuthorName ? (
+                      {commentAuthorSaved ? (
                         <p className="text-xs text-gray-400">
                           Commenting as <span className="font-semibold text-gray-600">{commentAuthorName}</span>{' '}
                           <button
                             onClick={() => {
                               setCommentAuthorName('')
+                              setCommentAuthorSaved(false)
                               localStorage.removeItem('felfam_comment_author')
                             }}
                             className="text-navy underline"
