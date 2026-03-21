@@ -654,6 +654,21 @@ function VendorEditor({
           <InfoBubble content="This person receives SMS for every request in the system—new requests, work updates, and status changes—regardless of who is assigned. Use for managers or coordinators who need full visibility." />
         </label>
       </div>
+      {(state.smsEnabled || state.smsBroadcast) && (
+        <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+          By enabling SMS, you confirm this person has provided express written consent to receive
+          SMS notifications from FelFam / PigJet regarding maintenance requests. Msg &amp; data
+          rates may apply. They may reply <strong>STOP</strong> to unsubscribe at any time.{' '}
+          <a
+            href="/sms-consent"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-navy"
+          >
+            SMS consent policy
+          </a>
+        </p>
+      )}
       <div className="flex gap-2">
         <button
           onClick={onSave}
