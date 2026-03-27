@@ -1,4 +1,4 @@
-import { Building2, MessageSquare, ShieldCheck, XCircle } from 'lucide-react'
+import { Building2, MessageSquare, ShieldCheck, XCircle, CheckCircle } from 'lucide-react'
 
 export const metadata = {
   title: 'SMS Consent & Opt-In | FelFam Maintenance',
@@ -21,22 +21,36 @@ export default function SmsConsentPage() {
           </div>
         </div>
 
-        {/* How opt-in works */}
+        {/* Program description */}
         <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-navy" />
+            <h2 className="text-lg font-semibold text-gray-900">SMS Program Description</h2>
+          </div>
+          <p className="text-sm text-gray-700">
+            FelFam Maintenance (operated by FelFam Property Management) sends SMS text messages
+            to vendors and maintenance staff to keep them informed about maintenance work orders.
+            Messages are sent from <strong>+1 (805) 590-9856</strong> via Twilio on behalf of
+            FelFam Property Management.
+          </p>
+          <p className="text-sm text-gray-700">
+            <strong>Message frequency</strong> varies based on maintenance activity.{' '}
+            <strong>Message and data rates may apply.</strong>
+          </p>
+        </section>
+
+        {/* How opt-in works */}
+        <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-500" />
             <h2 className="text-lg font-semibold text-gray-900">How SMS Opt-In Works</h2>
           </div>
           <p className="text-sm text-gray-700">
-            FelFam Maintenance sends SMS text messages to vendors and maintenance staff to keep
-            them informed about work orders. Opt-in is handled by a property manager inside the
-            app at{' '}
+            Opt-in is handled by a property manager inside the app at{' '}
             <span className="font-medium text-navy">maintenance.pigjet.com/settings</span> when
-            adding or editing a vendor&nbsp;/ assignee record.
-          </p>
-          <p className="text-sm text-gray-700">
-            Before enabling SMS notifications for any contact, the administrator must check the
-            following consent checkbox on that person&apos;s vendor profile:
+            adding or editing a vendor / assignee record. Before enabling SMS notifications for
+            any contact, the administrator must check the following express written consent
+            checkbox on that person&apos;s vendor profile:
           </p>
           <blockquote className="border-l-4 border-navy pl-4 py-2 bg-gray-50 rounded-r-lg text-sm text-gray-800 italic">
             &ldquo;I confirm this person has provided express written consent to receive SMS
@@ -44,8 +58,18 @@ export default function SmsConsentPage() {
             rates may apply. They may reply STOP at any time to unsubscribe.&rdquo;
           </blockquote>
           <p className="text-sm text-gray-700">
-            SMS notifications are <strong>not</strong> enabled for any contact until this box is
-            explicitly checked by an administrator.
+            After the administrator enables SMS, the vendor or staff member receives a
+            confirmation text message such as:
+          </p>
+          <blockquote className="border-l-4 border-green-500 pl-4 py-2 bg-green-50 rounded-r-lg text-sm text-gray-800">
+            &ldquo;FelFam Maintenance: You have been opted in to receive work order SMS
+            notifications. Msg &amp; data rates may apply. Reply STOP to unsubscribe, HELP for
+            help.&rdquo;
+          </blockquote>
+          <p className="text-sm text-gray-700">
+            SMS notifications are <strong>not</strong> enabled for any contact until the
+            administrator&apos;s consent checkbox is explicitly checked. No SMS messages are sent
+            to anyone who has not affirmatively opted in.
           </p>
         </section>
 
@@ -76,13 +100,41 @@ export default function SmsConsentPage() {
           <ul className="space-y-2 text-sm text-gray-700 list-disc list-inside">
             <li>
               <strong>Reply STOP</strong> to any SMS from FelFam Maintenance to immediately
-              unsubscribe.
+              unsubscribe. You will receive a confirmation that you have been removed.
+            </li>
+            <li>
+              <strong>Reply HELP</strong> to any message for help or contact information.
             </li>
             <li>
               Contact your property manager and ask them to disable SMS on your vendor record at{' '}
               <span className="font-medium">maintenance.pigjet.com/settings</span>.
             </li>
+            <li>
+              Email us at{' '}
+              <a href="mailto:ryan@felfam.com" className="text-navy underline">
+                ryan@felfam.com
+              </a>{' '}
+              to request removal.
+            </li>
           </ul>
+        </section>
+
+        {/* Privacy Policy */}
+        <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-2">
+          <h2 className="text-lg font-semibold text-gray-900">Privacy &amp; Data Use</h2>
+          <p className="text-sm text-gray-700">
+            Your phone number and SMS consent status are used solely to deliver work order
+            notifications. We do not share, sell, or use your mobile information for marketing
+            or advertising purposes. No mobile information will be shared with third parties or
+            affiliates for marketing or promotional purposes.
+          </p>
+          <p className="text-sm text-gray-700">
+            For complete details on how we handle your information, see our{' '}
+            <a href="/privacy" className="text-navy underline font-medium">
+              Privacy Policy
+            </a>
+            .
+          </p>
         </section>
 
         {/* Contact */}
@@ -92,13 +144,18 @@ export default function SmsConsentPage() {
             Contact FelFam Property Management at{' '}
             <a href="mailto:ryan@felfam.com" className="text-navy underline">
               ryan@felfam.com
-            </a>
-            .
+            </a>{' '}
+            or reply <strong>HELP</strong> to any SMS.
           </p>
+          <address className="not-italic text-sm text-gray-600 pt-1">
+            FelFam Property Management<br />
+            25418 Cumberland Ln., Calabasas, CA 91302
+          </address>
         </section>
 
         <p className="text-xs text-center text-gray-400">
-          © {new Date().getFullYear()} FelFam / PigJet. All rights reserved.
+          © {new Date().getFullYear()} FelFam Property Management. All rights reserved.{' '}
+          <a href="/privacy" className="underline">Privacy Policy</a>
         </p>
       </div>
     </div>
