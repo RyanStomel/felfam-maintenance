@@ -47,10 +47,10 @@ NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
 APP_BASE_URL=http://localhost:3000
-TWILIO_ACCOUNT_SID=ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-TWILIO_API_KEY_SID=SKXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-TWILIO_API_KEY_SECRET=YOUR_TWILIO_API_KEY_SECRET
-TWILIO_FROM_NUMBER=+18055909856
+TELNYX_API_KEY=KEY0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+TELNYX_FROM_NUMBER=+17472047447
+# Optional: set if Telnyx returns an error asking for a messaging profile (pools, alphanumeric sender, or account defaults)
+# TELNYX_MESSAGING_PROFILE_ID=40017f7a-6409-4c14-b693-37a8b5d7837b
 ```
 
 4. Run dev server
@@ -108,6 +108,9 @@ No-login internal app is simplest, but add restricted policies later if needed.
 2. Add env vars in Vercel Project Settings:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (needed for server-side SMS recipient queries)
+- `APP_BASE_URL` (your production URL, used for links in SMS bodies)
+- `TELNYX_API_KEY`, `TELNYX_FROM_NUMBER`, and optionally `TELNYX_MESSAGING_PROFILE_ID` (see [SMS notifications (Telnyx)](#sms-notifications-telnyx))
 
 3. Deploy.
 
@@ -122,18 +125,33 @@ In Vercel Project → **Settings → Domains**:
 
 ---
 
-## SMS notifications
+## SMS notifications (Telnyx)
 
-The app now supports Twilio SMS notifications for:
+Outbound SMS uses the [Telnyx Messaging API](https://developers.telnyx.com/docs/messaging/messages/send-message) (`POST https://api.telnyx.com/v2/messages`). The app sends notifications for:
+
 - new maintenance requests
 - new work log entries
 - status changes
 
+### Telnyx setup (Mission Control)
+
+1. Create a Telnyx account and an **API v2 key** (Account settings → API keys). Put the secret in `TELNYX_API_KEY` (sent as `Authorization: Bearer …`).
+2. Buy or port an **SMS-capable number** and attach it to a **Messaging profile** (required in the portal for SMS on that number).
+3. Set `TELNYX_FROM_NUMBER` to that number in **E.164** (this project uses `+17472047447`).
+4. If the API rejects sends without an explicit profile (e.g. number pools or some account setups), set `TELNYX_MESSAGING_PROFILE_ID` to the profile UUID from the portal.
+
+### Recipients
+
 Recipients are pulled from the `vendors` table:
-- assigned vendor receives SMS if `sms_enabled = true`
+
+- the assigned vendor receives SMS if `sms_enabled = true`
 - any vendor with `sms_broadcast = true` receives all request/work/status SMS
 
-Phone numbers must be stored in E.164 format. The app also accepts 10-digit US input in Settings and normalizes it before saving.
+Phone numbers must be valid E.164 for delivery. The app accepts 10-digit US input in Settings and normalizes it before saving.
+
+### Optional: compliance pages
+
+Update the public **SMS consent** and **privacy** copy if you change carriers or the sending number so they match your Telnyx configuration and legal program name.
 
 ## Future enhancements (optional)
 
