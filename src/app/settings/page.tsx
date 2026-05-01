@@ -13,6 +13,7 @@ import {
   Trash2,
   MessageSquare,
   Phone,
+  Send,
 } from 'lucide-react'
 import { formatPhoneNumberDisplay, normalizePhoneNumber, PHONE_NUMBER_ERROR } from '@/lib/phone'
 import { ConfirmModal } from '@/components/confirm-modal'
@@ -67,6 +68,10 @@ export default function SettingsPage(props: {
   const [confirmDelete, setConfirmDelete] = useState<
     { type: 'vendor'; item: Vendor } | { type: 'category'; item: SimpleItem } | null
   >(null)
+
+  const [smsTestTo, setSmsTestTo] = useState('')
+  const [smsTestMessage, setSmsTestMessage] = useState('FelFam Maintenance: SMS test message.')
+  const [smsTestSending, setSmsTestSending] = useState(false)
 
   useEffect(() => {
     loadAll()
@@ -295,6 +300,69 @@ export default function SettingsPage(props: {
         onToggle={(vendor) => toggleActive('vendors', vendor)}
         onDelete={openDeleteVendorModal}
       />
+
+      <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Send className="w-5 h-5 text-navy" />
+          <h2 className="font-semibold text-gray-900">Test SMS (Telnyx)</h2>
+        </div>
+        <p className="text-sm text-gray-500">
+          Send a one-off text through the production API. Use a number you control; message and
+          data rates may apply.
+        </p>
+        <input
+          value={smsTestTo}
+          onChange={(event) => setSmsTestTo(event.target.value)}
+          className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base min-h-[44px]"
+          placeholder="Destination phone (10-digit US or E.164)"
+          inputMode="tel"
+          autoComplete="tel"
+        />
+        <textarea
+          value={smsTestMessage}
+          onChange={(event) => setSmsTestMessage(event.target.value)}
+          rows={3}
+          className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base min-h-[88px] resize-y"
+          placeholder="Message body"
+        />
+        <button
+          type="button"
+          disabled={smsTestSending}
+          onClick={async () => {
+            if (!smsTestMessage.trim()) {
+              toast('Enter a message', 'error')
+              return
+            }
+            const to = normalizePhoneNumber(smsTestTo)
+            if (!to) {
+              toast(PHONE_NUMBER_ERROR, 'error')
+              return
+            }
+            setSmsTestSending(true)
+            try {
+              const res = await fetch('/api/sms/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ to, message: smsTestMessage.trim() }),
+              })
+              const data = (await res.json()) as { error?: string }
+              if (!res.ok) {
+                toast(data.error || 'SMS test failed', 'error')
+                return
+              }
+              toast('Test SMS sent')
+            } catch {
+              toast('SMS test failed', 'error')
+            } finally {
+              setSmsTestSending(false)
+            }
+          }}
+          className="px-4 py-3 rounded-xl bg-navy text-white font-medium min-h-[44px] inline-flex items-center gap-2 disabled:opacity-50"
+        >
+          <Send className="w-4 h-4" />
+          {smsTestSending ? 'Sending…' : 'Send test SMS'}
+        </button>
+      </section>
 
       <SimpleSection
         icon={<Tags className="w-5 h-5 text-navy" />}
