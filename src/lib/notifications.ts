@@ -1,8 +1,8 @@
-import twilio from 'twilio'
 import { isValidPhoneNumber } from 'libphonenumber-js'
 import type { Status } from '@/lib/types'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { normalizePhoneNumber } from '@/lib/phone'
+import { sendTelnyxSms } from '@/lib/telnyx-sms'
 
 type NotificationRecipient = {
   id: string
@@ -152,29 +152,25 @@ async function fetchRecipients(assignedTo: string | null) {
   return Array.from(deduped.values())
 }
 
-function createTwilioClient() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID
-  const apiKeySid = process.env.TWILIO_API_KEY_SID
-  const apiKeySecret = process.env.TWILIO_API_KEY_SECRET
-  const from = normalizePhoneNumber(process.env.TWILIO_FROM_NUMBER)
+function createTelnyxSmsConfig() {
+  const apiKey = process.env.TELNYX_API_KEY?.trim()
+  const from = normalizePhoneNumber(process.env.TELNYX_FROM_NUMBER)
+  const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID?.trim() || undefined
 
-  if (!accountSid || !apiKeySid || !apiKeySecret || !from) {
+  if (!apiKey || !from) {
     return null
   }
 
-  return {
-    client: twilio(apiKeySid, apiKeySecret, { accountSid }),
-    from,
-  }
+  return { apiKey, from, messagingProfileId }
 }
 
 export async function sendRequestSmsNotification(
   requestId: string,
   event: NotificationEvent
 ) {
-  const twilioConfig = createTwilioClient()
-  if (!twilioConfig) {
-    console.warn('[SMS] Skipped: Twilio not configured (missing env vars)')
+  const telnyx = createTelnyxSmsConfig()
+  if (!telnyx) {
+    console.warn('[SMS] Skipped: Telnyx not configured (missing TELNYX_API_KEY or TELNYX_FROM_NUMBER)')
     return
   }
 
@@ -190,7 +186,7 @@ export async function sendRequestSmsNotification(
   const validRecipients = recipients.filter((r) => {
     if (isValidPhoneNumber(r.phone_number)) return true
     console.warn(
-      `[SMS] Skipped invalid number for ${r.name} (${r.phone_number}): not valid E.164 for Twilio`
+      `[SMS] Skipped invalid number for ${r.name} (${r.phone_number}): not valid E.164`
     )
     return false
   })
@@ -202,10 +198,12 @@ export async function sendRequestSmsNotification(
 
   const results = await Promise.allSettled(
     validRecipients.map((recipient) =>
-      twilioConfig.client.messages.create({
-        from: twilioConfig.from,
+      sendTelnyxSms({
+        apiKey: telnyx.apiKey,
+        from: telnyx.from,
         to: recipient.phone_number,
-        body,
+        text: body,
+        messagingProfileId: telnyx.messagingProfileId,
       })
     )
   )
@@ -215,8 +213,8 @@ export async function sendRequestSmsNotification(
       const err = result.reason
       const recipient = validRecipients[index]?.name || validRecipients[index]?.phone_number
       console.error(`[SMS] Failed to send to ${recipient}:`, err?.message || err)
-      if (err && typeof err === 'object' && 'code' in err) {
-        console.error('[SMS] Twilio error code:', (err as { code?: number }).code)
+      if (err && typeof err === 'object' && 'status' in err) {
+        console.error('[SMS] Telnyx HTTP status:', (err as { status?: number }).status)
       }
     }
   })

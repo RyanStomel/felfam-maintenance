@@ -30,7 +30,7 @@ export default function SmsConsentPage() {
           <p className="text-sm text-gray-700">
             FelFam Maintenance (operated by FelFam Property Management) sends SMS text messages
             to vendors and maintenance staff to keep them informed about maintenance work orders.
-            Messages are sent from <strong>+1 (805) 590-9856</strong> via Twilio on behalf of
+            Messages are sent from the SMS-enabled number configured for this program via Telnyx on behalf of
             FelFam Property Management.
           </p>
           <p className="text-sm text-gray-700">

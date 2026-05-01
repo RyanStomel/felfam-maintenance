@@ -136,7 +136,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <ul className="list-disc list-inside space-y-1 pl-2">
               <li>
-                <strong>Service Providers:</strong> Twilio (SMS delivery), Supabase (database
+                <strong>Service Providers:</strong> Telnyx (SMS delivery), Supabase (database
                 hosting), and Vercel (platform hosting), each bound by confidentiality
                 obligations and used solely to operate the platform.
               </li>

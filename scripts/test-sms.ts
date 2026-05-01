@@ -13,32 +13,34 @@ for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
 }
 
 async function main() {
-  const mode = process.argv[2] // 'direct' = send to invalid number to capture Twilio error
+  const mode = process.argv[2] // 'direct' = send to invalid number to capture Telnyx error
   const requestId = process.argv[3] || '4060f3d8-602f-4882-bce0-db033e798bdb'
 
-  console.log('TWILIO_ACCOUNT_SID:', process.env.TWILIO_ACCOUNT_SID ? 'set' : 'missing')
-  console.log('TWILIO_API_KEY_SID:', process.env.TWILIO_API_KEY_SID ? 'set' : 'missing')
-  console.log('TWILIO_FROM_NUMBER:', process.env.TWILIO_FROM_NUMBER || 'missing')
+  console.log('TELNYX_API_KEY:', process.env.TELNYX_API_KEY ? 'set' : 'missing')
+  console.log('TELNYX_FROM_NUMBER:', process.env.TELNYX_FROM_NUMBER || 'missing')
+  console.log(
+    'TELNYX_MESSAGING_PROFILE_ID:',
+    process.env.TELNYX_MESSAGING_PROFILE_ID ? 'set' : 'missing (optional)'
+  )
 
   if (mode === 'direct') {
-    // Direct Twilio call to invalid number to capture error format
-    const twilio = (await import('twilio')).default
-    const client = twilio(
-      process.env.TWILIO_API_KEY_SID,
-      process.env.TWILIO_API_KEY_SECRET,
-      { accountSid: process.env.TWILIO_ACCOUNT_SID }
-    )
+    const { sendTelnyxSms } = await import('../src/lib/telnyx-sms')
+    if (!process.env.TELNYX_API_KEY || !process.env.TELNYX_FROM_NUMBER) {
+      console.error('Missing TELNYX_API_KEY or TELNYX_FROM_NUMBER')
+      process.exit(1)
+    }
     try {
-      await client.messages.create({
-        from: process.env.TWILIO_FROM_NUMBER,
+      await sendTelnyxSms({
+        apiKey: process.env.TELNYX_API_KEY,
+        from: process.env.TELNYX_FROM_NUMBER,
         to: '+15551234567', // Invalid/test number
-        body: 'Test',
+        text: 'Test',
+        messagingProfileId: process.env.TELNYX_MESSAGING_PROFILE_ID?.trim() || undefined,
       })
       console.log('Unexpected: message was accepted')
     } catch (err: unknown) {
-      console.error('Twilio error (expected for invalid number):')
+      console.error('Telnyx error (expected for invalid number):')
       console.error('  message:', (err as Error)?.message)
-      console.error('  code:', (err as { code?: number })?.code)
       console.error('  status:', (err as { status?: number })?.status)
       console.error('  full:', err)
     }
@@ -58,7 +60,7 @@ async function main() {
     console.error('SMS notification error:', err)
     if (err && typeof err === 'object' && 'message' in err) {
       console.error('Message:', (err as Error).message)
-      if ('code' in err) console.error('Code:', (err as Error & { code?: number }).code)
+      if ('status' in err) console.error('HTTP status:', (err as Error & { status?: number }).status)
     }
   }
 }
