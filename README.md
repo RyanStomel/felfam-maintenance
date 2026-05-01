@@ -48,7 +48,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
 APP_BASE_URL=http://localhost:3000
 TELNYX_API_KEY=KEY0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
-TELNYX_FROM_NUMBER=+18055909856
+TELNYX_FROM_NUMBER=+17472047447
 # Optional: set if Telnyx returns an error asking for a messaging profile (pools, alphanumeric sender, or account defaults)
 # TELNYX_MESSAGING_PROFILE_ID=40017f7a-6409-4c14-b693-37a8b5d7837b
 ```
@@ -137,7 +137,7 @@ Outbound SMS uses the [Telnyx Messaging API](https://developers.telnyx.com/docs/
 
 1. Create a Telnyx account and an **API v2 key** (Account settings → API keys). Put the secret in `TELNYX_API_KEY` (sent as `Authorization: Bearer …`).
 2. Buy or port an **SMS-capable number** and attach it to a **Messaging profile** (required in the portal for SMS on that number).
-3. Set `TELNYX_FROM_NUMBER` to that number in **E.164** (e.g. `+18055551212`).
+3. Set `TELNYX_FROM_NUMBER` to that number in **E.164** (this project uses `+17472047447`).
 4. If the API rejects sends without an explicit profile (e.g. number pools or some account setups), set `TELNYX_MESSAGING_PROFILE_ID` to the profile UUID from the portal.
 
 ### Recipients
