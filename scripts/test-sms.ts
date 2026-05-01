@@ -2,22 +2,27 @@
  * Test script to trigger SMS notification and capture any errors.
  * Run: npx tsx scripts/test-sms.ts
  */
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 
-// Load .env.local
+// Load .env.local when present
 const envPath = resolve(process.cwd(), '.env.local')
-for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
-  const match = line.match(/^([^#=]+)=(.*)$/)
-  if (match) process.env[match[1].trim()] = match[2].trim()
+if (existsSync(envPath)) {
+  for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+    const match = line.match(/^([^#=]+)=(.*)$/)
+    if (match) process.env[match[1].trim()] = match[2].trim()
+  }
 }
 
 async function main() {
   const mode = process.argv[2] // 'direct' = send to invalid number to capture Telnyx error
   const requestId = process.argv[3] || '4060f3d8-602f-4882-bce0-db033e798bdb'
 
+  const { TELNYX_SMS_FROM_E164 } = await import('../src/lib/telnyx-config')
+  const { normalizePhoneNumber } = await import('../src/lib/phone')
+
   console.log('TELNYX_API_KEY:', process.env.TELNYX_API_KEY ? 'set' : 'missing')
-  console.log('TELNYX_FROM_NUMBER:', process.env.TELNYX_FROM_NUMBER || 'missing')
+  console.log('TELNYX_SMS_FROM_E164 (hardcoded):', TELNYX_SMS_FROM_E164)
   console.log(
     'TELNYX_MESSAGING_PROFILE_ID:',
     process.env.TELNYX_MESSAGING_PROFILE_ID ? 'set' : 'missing (optional)'
@@ -25,14 +30,19 @@ async function main() {
 
   if (mode === 'direct') {
     const { sendTelnyxSms } = await import('../src/lib/telnyx-sms')
-    if (!process.env.TELNYX_API_KEY || !process.env.TELNYX_FROM_NUMBER) {
-      console.error('Missing TELNYX_API_KEY or TELNYX_FROM_NUMBER')
+    if (!process.env.TELNYX_API_KEY) {
+      console.error('Missing TELNYX_API_KEY')
+      process.exit(1)
+    }
+    const from = normalizePhoneNumber(TELNYX_SMS_FROM_E164)
+    if (!from) {
+      console.error('Invalid TELNYX_SMS_FROM_E164 in telnyx-config')
       process.exit(1)
     }
     try {
       await sendTelnyxSms({
         apiKey: process.env.TELNYX_API_KEY,
-        from: process.env.TELNYX_FROM_NUMBER,
+        from,
         to: '+15551234567', // Invalid/test number
         text: 'Test',
         messagingProfileId: process.env.TELNYX_MESSAGING_PROFILE_ID?.trim() || undefined,

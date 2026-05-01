@@ -2,6 +2,7 @@ import { isValidPhoneNumber } from 'libphonenumber-js'
 import type { Status } from '@/lib/types'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { normalizePhoneNumber } from '@/lib/phone'
+import { TELNYX_SMS_FROM_E164 } from '@/lib/telnyx-config'
 import { sendTelnyxSms } from '@/lib/telnyx-sms'
 
 type NotificationRecipient = {
@@ -154,7 +155,7 @@ async function fetchRecipients(assignedTo: string | null) {
 
 function createTelnyxSmsConfig() {
   const apiKey = process.env.TELNYX_API_KEY?.trim()
-  const from = normalizePhoneNumber(process.env.TELNYX_FROM_NUMBER)
+  const from = normalizePhoneNumber(TELNYX_SMS_FROM_E164)
   const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID?.trim() || undefined
 
   if (!apiKey || !from) {
@@ -170,7 +171,7 @@ export async function sendRequestSmsNotification(
 ) {
   const telnyx = createTelnyxSmsConfig()
   if (!telnyx) {
-    console.warn('[SMS] Skipped: Telnyx not configured (missing TELNYX_API_KEY or TELNYX_FROM_NUMBER)')
+    console.warn('[SMS] Skipped: Telnyx not configured (missing TELNYX_API_KEY)')
     return
   }
 
