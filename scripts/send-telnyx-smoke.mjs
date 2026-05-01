@@ -1,5 +1,5 @@
 /**
- * One-off Telnyx smoke sends. Requires TELNYX_API_KEY and TELNYX_FROM_NUMBER.
+ * One-off Telnyx smoke sends. Requires TELNYX_API_KEY (from number is hardcoded in repo).
  * Loads .env.local when present (same KEY=value rules as test-sms.ts).
  *
  * Run: node scripts/send-telnyx-smoke.mjs
@@ -16,6 +16,8 @@ if (existsSync(envPath)) {
 }
 
 const TELNYX_MESSAGES_URL = 'https://api.telnyx.com/v2/messages'
+/** Keep in sync with src/lib/telnyx-config.ts */
+const TELNYX_SMS_FROM_E164 = '+17472047447'
 
 async function sendMessage({ apiKey, from, to, text, messagingProfileId }) {
   const body = { from, to, text }
@@ -43,13 +45,11 @@ async function sendMessage({ apiKey, from, to, text, messagingProfileId }) {
 
 function main() {
   const apiKey = process.env.TELNYX_API_KEY?.trim()
-  const from = process.env.TELNYX_FROM_NUMBER?.trim()
+  const from = TELNYX_SMS_FROM_E164
   const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID?.trim() || undefined
 
-  if (!apiKey || !from) {
-    console.error(
-      'Missing TELNYX_API_KEY or TELNYX_FROM_NUMBER. Set them in the environment or .env.local.'
-    )
+  if (!apiKey) {
+    console.error('Missing TELNYX_API_KEY. Set it in the environment or .env.local.')
     process.exit(1)
   }
 
